@@ -14,6 +14,9 @@ from bs4 import BeautifulSoup
 # Tumblr stuff
 MEDIA_POST_TYPES = ["regular", "photo", "video"]    # I don't know what "regular" type is for... Sometimes it contains medias, sometimes not, anyway it is a post from the blog owner (not reblogged)
 
+# Downloads folder
+DOWNLOADS_FOLDER = os.path.join(os.getcwd(), "downloads")
+
 # Setting timeout
 TIMEOUT = 10
 
@@ -253,10 +256,10 @@ class CrawlerScheduler(object):
         print("Finish Downloading All the photos from %s" % tumblr_name)
 
     def _download_media(self, tumblr_name, medium_type, start, post_filter=lambda x: True):
-        current_folder = os.getcwd()
-        target_folder = os.path.join(current_folder, tumblr_name)
+        target_folder = os.path.join(DOWNLOADS_FOLDER, tumblr_name)
+
         if not os.path.isdir(target_folder):
-            os.mkdir(target_folder)
+            os.makedirs(target_folder)
 
         base_url = "https://{0}.tumblr.com/api/read?type={1}&num={2}&start={3}"
         start = START_POST_INDEX
@@ -273,8 +276,8 @@ class CrawlerScheduler(object):
                 xml_cleaned = re.sub(u'[^\x20-\x7f]+',
                                      u'', response.content.decode('utf-8'))
 
-                response_file = "{0}/{0}_{1}_{2}_{3}.response.xml".format(tumblr_name, medium_type, MEDIA_NUM, start)
-                with open(response_file, "w") as text_file:
+                response_file = "{0}_{1}_{2}_{3}.response.xml".format(tumblr_name, medium_type, MEDIA_NUM, start)
+                with open(os.path.join(DOWNLOADS_FOLDER, response_file), "w") as text_file:
                     text_file.write(xml_cleaned)
 
                 data = xmltodict.parse(xml_cleaned)
@@ -283,8 +286,8 @@ class CrawlerScheduler(object):
                     # by default it is switched to false to generate less files,
                     # as anyway you can extract this from bulk xml files.
                     if EACH_POST_AS_SEPARATE_JSON:
-                        post_json_file = "{0}/{0}_post_id_{1}.post.json".format(tumblr_name, post['@id'])
-                        with open(post_json_file, "w") as text_file:
+                        post_json_file = "{0}_post_id_{1}.post.json".format(tumblr_name, post['@id'])
+                        with open(os.path.join(DOWNLOADS_FOLDER, post_json_file), "w") as text_file:
                             text_file.write(json.dumps(post))
 
                     medium_type = self.get_post_type(post)
@@ -306,7 +309,7 @@ class CrawlerScheduler(object):
                 print("Cannot decode response data from URL %s" % media_url)
                 continue
             except Exception as e:
-                print(e)
+                raise e
                 print("Unknown xml-vulnerabilities from URL %s" % media_url)
                 continue
 
