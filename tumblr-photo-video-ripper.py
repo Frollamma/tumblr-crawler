@@ -232,9 +232,7 @@ class CrawlerScheduler(object):
         
         print(f"Original post found! - Queue: {self.queue.qsize()}")
         return True
-        
-        return False
-    
+            
     def download_media(self, tumblr_name, original_posts_only=False):
         if original_posts_only:
             post_filter = self.is_original_post
@@ -322,7 +320,7 @@ class CrawlerScheduler(object):
                 continue
 
 
-def usage():
+def print_usage():
     print("1. Please create file tumblr_names.txt under this same directory.\n"
           "2. In tumblr_names.txt, you can specify tumblr tumblr_names separated by "
           "comma/space/tab/CR. Accept multiple lines of text\n"
@@ -330,21 +328,11 @@ def usage():
           "Sample File Content:\ntumblr_name1,tumblr_name2\n\n"
           "Or use command line options:\n\n"
           "Sample:\npython tumblr-photo-video-ripper.py tumblr_name1,tumblr_name2\n\n\n")
-    print(u"未找到tumblr_names.txt文件，请创建.\n"
-          u"请在文件中指定Tumblr站点名，并以 逗号/空格/tab/表格鍵/回车符 分割，支持多行.\n"
-          u"保存文件并重试.\n\n"
-          u"例子: tumblr_name1,tumblr_name2\n\n"
-          u"或者直接使用命令行参数指定站点\n"
-          u"例子: python tumblr-photo-video-ripper.py tumblr_name1,tumblr_name2")
 
-
-def illegal_json():
+def print_illegal_json():
     print("Illegal JSON format in file 'proxies.json'.\n"
           "Please refer to 'proxies_sample1.json' and 'proxies_sample2.json'.\n"
           "And go to http://jsonlint.com/ for validation.\n\n\n")
-    print(u"文件proxies.json格式非法.\n"
-          u"请参照示例文件'proxies_sample1.json'和'proxies_sample2.json'.\n"
-          u"然后去 http://jsonlint.com/ 进行验证.")
 
 
 def parse_tumblr_names(filename):
@@ -379,7 +367,7 @@ if __name__ == "__main__":
                     print("You are using proxies.\n%s" % proxies)
             except Exception as e:
                 raise e
-                illegal_json()
+                print_illegal_json()
                 sys.exit(1)
 
     if len(sys.argv) < 2:
@@ -388,13 +376,13 @@ if __name__ == "__main__":
         if os.path.exists(filename):
             tumblr_names = parse_tumblr_names(filename)
         else:
-            usage()
+            print_usage()
             sys.exit(1)
     else:
         tumblr_names = sys.argv[1].split(",")
 
     if len(tumblr_names) == 0 or tumblr_names[0] == "":
-        usage()
+        print_usage()
         sys.exit(1)
 
     crawler = CrawlerScheduler(tumblr_names, proxies=proxies)
