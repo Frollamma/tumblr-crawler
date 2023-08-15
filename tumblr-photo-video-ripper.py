@@ -14,6 +14,9 @@ from bs4 import BeautifulSoup
 # Tumblr stuff
 MEDIA_POST_TYPES = ["regular", "photo", "video"]    # I don't know what "regular" type is for... Sometimes it contains medias, sometimes not, anyway it is a post from the blog owner (not reblogged)
 
+# Debug
+DEBUG = False
+
 # Downloads folder
 DOWNLOADS_FOLDER = os.path.join(os.getcwd(), "downloads")
 
@@ -26,8 +29,8 @@ RETRY = 5
 # Index of the first post to be crawled (indexes start from 0). This index is included
 START_POST_INDEX = 0
 
-# Index of the next post after the last post. This index is excluded
-END_POST_INDEX = 3000
+# Index of the next post after the last post. This index is excluded. If you use None there is no upper limit
+END_POST_INDEX = None
 
 # Numbers of photos/videos per page
 MEDIA_NUM = 50
@@ -48,7 +51,7 @@ def video_hd_match():
         try:
             if hd_match is not None and hd_match.group(1) != 'false':
                 return hd_match.group(2).replace('\\', '')
-        except:
+        except Exception as e:
             return None
     return match
 
@@ -61,7 +64,7 @@ def video_default_match():
         if default_match is not None:
             try:
                 return default_match.group(1)
-            except:
+            except Exception as e:
                 return None
     return match
 
@@ -83,7 +86,12 @@ class DownloadWorker(Thread):
         try:
             medium_urls = self._handle_medium_urls(medium_type, post)
             
-            print("Try to download medium...")
+            print(f"Try to download medium... {medium_urls}")
+
+            if medium_urls == []:#TEMP!
+                print("Probably this is just text")
+                # print(f"{post = }")
+
             if medium_urls:
                 # print("No medium url specified|")
                 
@@ -92,7 +100,6 @@ class DownloadWorker(Thread):
         except TypeError as e:
             print(e)
             print(f"Didn't download medium, with type {medium_type}")
-            pass
 
     # can register different regex match rules
     def _register_regex_match_rules(self):
@@ -108,15 +115,9 @@ class DownloadWorker(Thread):
 
         for img in imgs:
             srcset = img["srcset"]
-            # print(f"{srcset = }")
-            # srcset = srcset.strip().strip(",").strip().split("\n")
-            # print(f"{srcset = }")
-            # best_quality_image_src = srcset[-1].lstrip().rstrip()
-            # print(f"{best_quality_image_src = }")
-            # best_quality_image_src = best_quality_image_src.split(" ")[0]
-            # print(f"{best_quality_image_src = }")
+
             best_quality_image_src = srcset.split(" ")[-2]
-            print(f"{best_quality_image_src = }")
+
             srcs.append(best_quality_image_src)
         
         return srcs
@@ -171,13 +172,13 @@ class DownloadWorker(Thread):
                                         timeout=TIMEOUT)
                     if resp.status_code == 403:
                         retry_times = RETRY
-                        print("Access Denied when retrieve %s.\n" % medium_url)
+                        print(f"Access Denied when retrieving {medium_url}.\n")
                         raise Exception("Access Denied")
                     with open(file_path, 'wb') as fh:
                         for chunk in resp.iter_content(chunk_size=1024):
                             fh.write(chunk)
                     break
-                except:
+                except Exception as e:
                     # try again
                     pass
                 retry_times += 1
@@ -188,6 +189,8 @@ class DownloadWorker(Thread):
                     pass
                 print("Failed to retrieve %s from %s.\n" % (medium_type,
                                                             medium_url))
+        else:
+            print("File already downloaded!")
 
 
 class CrawlerScheduler(object):
@@ -224,11 +227,11 @@ class CrawlerScheduler(object):
 
     def is_original_post(self, post):
         # print(f"{post = }")
-        try:
-            print(post["@reblogged-from-name"])
-        except KeyError:
-            print(f"Original post found! - Queue: {self.queue.qsize()}")
-            return True
+        if "@reblogged-from-name" in post:
+            return False
+        
+        print(f"Original post found! - Queue: {self.queue.qsize()}")
+        return True
         
         return False
     
@@ -264,7 +267,7 @@ class CrawlerScheduler(object):
         base_url = "https://{0}.tumblr.com/api/read?type={1}&num={2}&start={3}"
         start = START_POST_INDEX
 
-        while start < END_POST_INDEX:
+        while END_POST_INDEX is None or start < END_POST_INDEX:
             media_url = base_url.format(tumblr_name, medium_type, MEDIA_NUM, start)
             response = requests.get(media_url,
                                     proxies=self.proxies)
@@ -277,8 +280,9 @@ class CrawlerScheduler(object):
                                      u'', response.content.decode('utf-8'))
 
                 response_file = "{0}_{1}_{2}_{3}.response.xml".format(tumblr_name, medium_type, MEDIA_NUM, start)
-                with open(os.path.join(DOWNLOADS_FOLDER, response_file), "w") as text_file:
-                    text_file.write(xml_cleaned)
+                if DEBUG:
+                    with open(os.path.join(DOWNLOADS_FOLDER, response_file), "w") as text_file:
+                        text_file.write(xml_cleaned)
 
                 data = xmltodict.parse(xml_cleaned)
                 posts = data["tumblr"]["posts"]["post"]
@@ -291,13 +295,17 @@ class CrawlerScheduler(object):
                             text_file.write(json.dumps(post))
 
                     medium_type = self.get_post_type(post)
+                    print(f"{medium_type = }")
                     if medium_type in MEDIA_POST_TYPES and post_filter(post):
+                        print("Valid post types")
                         try:
                             # if post has photoset, walk into photoset for each photo
+                            print("E' un photoset!")
                             photoset = post["photoset"]["photo"]
                             for photo in photoset:
                                 self.queue.put((medium_type, photo, target_folder))
                         except Exception as e:
+                            print("Enzo")
                             print(e)
                             # select the largest resolution
                             # usually in the first element
@@ -369,7 +377,8 @@ if __name__ == "__main__":
                 proxies = json.load(fj)
                 if proxies is not None and len(proxies) > 0:
                     print("You are using proxies.\n%s" % proxies)
-            except:
+            except Exception as e:
+                raise e
                 illegal_json()
                 sys.exit(1)
 
@@ -389,4 +398,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     crawler = CrawlerScheduler(tumblr_names, proxies=proxies)
-    crawler.start(original_posts_only=True)     # IMPR!
+    crawler.start(original_posts_only=True)     # IMPR!: add a way to control this in the CLI
