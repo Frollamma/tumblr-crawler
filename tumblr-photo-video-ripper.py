@@ -4,7 +4,7 @@ import os
 import sys
 import requests
 import xmltodict
-from six.moves import queue as Queue
+from six.moves import queue
 from threading import Thread
 import re
 import json
@@ -198,7 +198,7 @@ class CrawlerScheduler(object):
     def __init__(self, tumblr_names, proxies=None):
         self.tumblr_names = tumblr_names
         self.proxies = proxies
-        self.queue = Queue.Queue()
+        self.queue = queue.Queue()
 
     def start(self, original_posts_only=False):
         # create workers
